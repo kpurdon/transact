@@ -7,9 +7,9 @@ import (
 	"database/sql"
 )
 
-// Do executes the given txFunc inside of a new transaction handling all possible rollback and
-// commit scenarios.
-func Do(ctx context.Context, db *sql.DB, txFunc func(*sql.Tx) error) (err error) {
+// DoContext executes the given txFunc inside of a new transaction handling all possible rollback
+// and commit scenarios.
+func DoContext(ctx context.Context, db *sql.DB, txFunc func(*sql.Tx) error) (err error) {
 	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return
@@ -31,4 +31,10 @@ func Do(ctx context.Context, db *sql.DB, txFunc func(*sql.Tx) error) (err error)
 	}()
 
 	return txFunc(tx)
+}
+
+// Do executes the given txFunc inside of a new transaction handling all possible rollback and
+// commit scenarios.
+func Do(db *sql.DB, txFunc func(*sql.Tx) error) (err error) {
+	return DoContext(context.Background(), db, txFunc)
 }
