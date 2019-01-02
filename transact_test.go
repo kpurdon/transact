@@ -99,3 +99,60 @@ func TestDoContext(t *testing.T) {
 		})
 	}
 }
+
+func TestDo(t *testing.T) {
+	testCases := []struct {
+		label  string
+		txFunc func(tx *sql.Tx) error
+		check  func(t *testing.T, db *sql.DB, mock sqlmock.Sqlmock, txFunc func(tx *sql.Tx) error)
+	}{
+		{
+			label: "an error is returned on any error",
+			txFunc: func(tx *sql.Tx) error {
+				return assert.AnError
+			},
+			check: func(t *testing.T, db *sql.DB, mock sqlmock.Sqlmock, txFunc func(tx *sql.Tx) error) {
+				mock.ExpectBegin()
+				mock.ExpectRollback()
+				require.EqualError(t, Do(db, txFunc), assert.AnError.Error())
+				assert.NoError(t, mock.ExpectationsWereMet())
+			},
+		}, {
+			label: "a panic is raised on any panic",
+			txFunc: func(tx *sql.Tx) error {
+				panic(assert.AnError)
+			},
+			check: func(t *testing.T, db *sql.DB, mock sqlmock.Sqlmock, txFunc func(tx *sql.Tx) error) {
+				mock.ExpectBegin()
+				mock.ExpectRollback()
+				require.Panics(t, func() { Do(db, txFunc) })
+				assert.NoError(t, mock.ExpectationsWereMet())
+			},
+		}, {
+			label: "no error is returned on any success",
+			txFunc: func(tx *sql.Tx) error {
+				return nil
+			},
+			check: func(t *testing.T, db *sql.DB, mock sqlmock.Sqlmock, txFunc func(tx *sql.Tx) error) {
+				mock.ExpectBegin()
+				mock.ExpectCommit()
+				require.NoError(t, Do(db, txFunc))
+				assert.NoError(t, mock.ExpectationsWereMet())
+			},
+		},
+	}
+
+	for i, tc := range testCases {
+		tc := tc
+		t.Run(fmt.Sprintf("%d", i), func(t *testing.T) {
+			t.Parallel()
+			t.Log(tc.label)
+
+			db, mock, err := sqlmock.New()
+			require.NoError(t, err)
+			defer db.Close()
+
+			tc.check(t, db, mock, tc.txFunc)
+		})
+	}
+}
